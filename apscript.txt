@@ -1,0 +1,117 @@
+// === KONFIGURASI ===
+const SHEET_NAME = 'Data';
+const API_KEY = 'bikinkarya-selamanya'; // Ganti dengan API key milikmu sendiri
+
+// === UTILITAS ===
+function getSheet_() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName(SHEET_NAME);
+  if (!sheet) throw new Error('Sheet "' + SHEET_NAME + '" tidak ditemukan');
+  return sheet;
+}
+
+function parseBody_(e) {
+  if (e.postData && e.postData.contents) {
+    try {
+      return JSON.parse(e.postData.contents);
+    } catch (err) {
+      throw new Error('Body request tidak valid (harus JSON)');
+    }
+  }
+  return {};
+}
+
+function checkApiKey_(e) {
+  const body = parseBody_(e);
+  const key = (e.parameter && e.parameter.key) || body.key;
+  if (key !== API_KEY) throw new Error('API key tidak valid atau tidak disertakan');
+}
+
+function jsonResponse_(obj) {
+  return ContentService.createTextOutput(JSON.stringify(obj))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
+// === GET: Membaca Data ===
+function doGet(e) {
+  try {
+    //checkApiKey_(e);
+    const sheet = getSheet_();
+
+    // Pastikan parameter kode dikirim
+    if (!e.parameter || !e.parameter.kode) {
+      throw new Error('Parameter "kode" wajib disertakan');
+    }
+
+    const kodeDicari = e.parameter.kode;
+    const data = sheet.getDataRange().getValues();
+    const headers = data[0];
+    const kodeIndex = headers.indexOf('kode');
+
+    if (kodeIndex === -1) {
+      throw new Error('Kolom "kode" tidak ditemukan di sheet');
+    }
+
+    // Cari baris yang cocok
+    let hasil = [];
+    for (let i = 1; i < data.length; i++) {
+      if (String(data[i][kodeIndex]) === String(kodeDicari)) {
+        const row = data[i];
+        const obj = {};
+        headers.forEach((h, j) => obj[h] = row[j]);
+        hasil.push(obj);
+        break; // keluar setelah ketemu
+      }
+    }
+
+    if (hasil.length === 0) {
+      return jsonResponse_({ status: 'error', message: 'Data dengan kode tersebut tidak ditemukan' });
+    }
+
+    return jsonResponse_({ status: 'success', data: hasil });
+
+  } catch (err) {
+    return jsonResponse_({ status: 'error', message: err.message });
+  }
+}
+
+
+// === POST: Menambah Data Baru ===
+function doPost(e) {
+  try {
+    checkApiKey_(e);
+    const sheet = getSheet_();
+    const body = parseBody_(e);
+
+    const kode = body.kode;
+    const link = body.link;
+
+    if (!kode || !link) {
+      throw new Error('Field "kode" dan "link" wajib diisi');
+    }
+
+    // Baca semua data untuk validasi duplikat
+    const data = sheet.getDataRange().getValues();
+    const headers = data[0];
+    const kodeIndex = headers.indexOf('kode');
+
+    if (kodeIndex === -1) {
+      throw new Error('Kolom "kode" tidak ditemukan di sheet. Pastikan header: no | kode | link');
+    }
+
+    const existing = data.slice(1).some(row => String(row[kodeIndex]) === String(kode));
+    if (existing) {
+      throw new Error('Kode sudah ada, gunakan kode lain.');
+    }
+
+    // Hitung nomor urut berikut
+    const nextNo = sheet.getLastRow();
+
+    // Tambahkan baris baru
+    sheet.appendRow([nextNo, kode, link]);
+
+    return jsonResponse_({ status: 'success', message: 'Data berhasil ditambahkan' });
+  } catch (err) {
+    return jsonResponse_({ status: 'error', message: err.message });
+  }
+}

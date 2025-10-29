@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Redirecting...</title>
+  <style>
+    body {
+      font-family: "Segoe UI", sans-serif;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      background: #fff;
+      flex-direction: column;
+      color: #333;
+      text-align: center;
+    }
+    h2 { font-weight: 500; margin-bottom: 8px; }
+    p { color: #555; font-size: 15px; }
+    .dots::after { content: ''; animation: dots 1.5s steps(5, end) infinite; }
+    @keyframes dots {
+      0%, 20% { content: '.'; }
+      40% { content: '..'; }
+      60%, 100% { content: '...'; }
+    }
+    .spinner {
+      margin-top: 20px;
+      width: 32px;
+      height: 32px;
+      border: 3px solid #ddd;
+      border-top-color: #3498db;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin-left: auto; margin-right: auto;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    small { display: block; margin-top: 30px; font-size: 12px; color: #999; }
+  </style>
+</head>
+<body>
+  <div>
+    <h2>Mengunjungi Halaman<span class="dots"></span></h2>
+    <p id="message">Harap tunggu, kami sedang memproses permintaan Anda.</p>
+    <div class="spinner"></div>
+    <small>Merawat Ilmu, Melestarikan Budaya</small>
+  </div>
+
+  <script src="lorip.js"></script>
+
+  <script>
+    const params = new URLSearchParams(window.location.search);
+    const kode = params.get("s");
+    const fallbackURL = "https://fitrah.sch.id";
+
+    if (!window.APP_CONFIG || !window.APP_CONFIG.ENDPOINT) {
+      document.getElementById("message").textContent = "Konfigurasi tidak ditemukan.";
+      throw new Error("Config error");
+    }
+
+    const endpoint = `${window.APP_CONFIG.ENDPOINT}?&kode=${kode}`;
+
+    if (!kode) {
+      document.getElementById("message").textContent = "Kode tidak ditemukan. Mengarahkan ke halaman utama...";
+      setTimeout(() => (window.location.href = fallbackURL), 1500);
+    } else {
+      fetch(endpoint)
+        .then((res) => res.json())
+        .then((result) => {
+          if (result.status === "success" && result.data?.length > 0) {
+            const target = result.data[0].link;
+            document.getElementById("message").textContent = `Berhasil ditemukan, mengarahkan ke ${target}`;
+            setTimeout(() => (window.location.href = target), 1000);
+          } else {
+            document.getElementById("message").textContent = "Data tidak ditemukan. Mengarahkan ke halaman utama...";
+            setTimeout(() => (window.location.href = fallbackURL), 1500);
+          }
+        })
+        .catch((err) => {
+          console.error(err);
+          document.getElementById("message").textContent = "Terjadi kesalahan. Mengarahkan ke halaman utama...";
+          setTimeout(() => (window.location.href = fallbackURL), 1500);
+        });
+    }
+  </script>
+</body>
+</html>
